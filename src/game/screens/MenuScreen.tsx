@@ -1,6 +1,7 @@
 import { GrainOverlay } from '@/components/grain-overlay'
 import { Shader, Swirl, ChromaFlow } from 'shaders/react'
 import type { GameState } from '../types'
+import { CharacterSVG } from '../components/CharacterSVG'
 
 interface Props {
   onStart: () => void
@@ -8,6 +9,8 @@ interface Props {
 }
 
 export function MenuScreen({ onStart, state }: Props) {
+  const hasCharacter = state.day > 1
+
   return (
     <div className="relative h-screen w-full overflow-hidden bg-black">
       <GrainOverlay />
@@ -20,7 +23,13 @@ export function MenuScreen({ onStart, state }: Props) {
       </div>
 
       <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center">
-        <div className="mb-4 text-7xl animate-bounce">🩺</div>
+        {hasCharacter ? (
+          <div className="mb-2 drop-shadow-2xl" style={{ filter: 'drop-shadow(0 0 30px rgba(168,85,247,0.4))' }}>
+            <CharacterSVG appearance={state.character} size={130} animated />
+          </div>
+        ) : (
+          <div className="mb-4 text-7xl animate-bounce">🩺</div>
+        )}
         <h1 className="mb-2 font-sans text-5xl font-bold tracking-tight text-white md:text-7xl">
           Медик
         </h1>

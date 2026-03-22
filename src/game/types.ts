@@ -9,8 +9,29 @@ export type GameScreen =
   | 'pickup'
   | 'work'
   | 'relationship'
+  | 'customize'
 
 export type ItemCategory = 'furniture' | 'stationery' | 'clothes' | 'decor'
+
+export type SkinTone = 'light' | 'medium' | 'tan' | 'dark' | 'deep'
+export type HairColor = 'black' | 'brown' | 'blonde' | 'red' | 'gray' | 'pink' | 'blue'
+export type HairStyle = 'short' | 'ponytail' | 'long' | 'bun' | 'curly' | 'braids'
+export type BodyShape = 'slim' | 'average' | 'curvy' | 'athletic'
+export type OutfitId = 'casual' | 'scrubs' | 'formal' | 'sporty' | 'cozy' | 'party'
+export type EyeColor = 'brown' | 'green' | 'blue' | 'gray' | 'hazel'
+export type FaceShape = 'oval' | 'round' | 'heart' | 'square'
+
+export interface CharacterAppearance {
+  name: string
+  skinTone: SkinTone
+  hairColor: HairColor
+  hairStyle: HairStyle
+  bodyShape: BodyShape
+  eyeColor: EyeColor
+  faceShape: FaceShape
+  currentOutfit: OutfitId
+  unlockedOutfits: OutfitId[]
+}
 
 export interface RoomItem {
   id: string
@@ -73,4 +94,5 @@ export interface GameState {
   workShifts: number
   unlockedLocations: string[]
   notifications: string[]
+  character: CharacterAppearance
 }

@@ -1,5 +1,6 @@
 import type { GameState } from '../types'
 import { GrainOverlay } from '@/components/grain-overlay'
+import { CharacterSVG } from '../components/CharacterSVG'
 
 interface Props {
   state: GameState
@@ -7,6 +8,7 @@ interface Props {
   onOpenMap: () => void
   onOpenShop: () => void
   onOpenPhone: () => void
+  onOpenWardrobe: () => void
   onNextDay: () => void
   onTriggerEvent: () => void
 }
@@ -25,7 +27,7 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
   )
 }
 
-export function HubScreen({ state, onOpenRoom, onOpenMap, onOpenShop, onOpenPhone, onNextDay, onTriggerEvent }: Props) {
+export function HubScreen({ state, onOpenRoom, onOpenMap, onOpenShop, onOpenPhone, onOpenWardrobe, onNextDay, onTriggerEvent }: Props) {
   const placedCount = state.roomItems.filter(i => i.placed).length
   const totalItems = state.roomItems.length
   const readyOrders = state.orders.filter(o => o.status === 'ready').length
@@ -50,23 +52,43 @@ export function HubScreen({ state, onOpenRoom, onOpenMap, onOpenShop, onOpenPhon
         </div>
       </div>
 
-      {/* Character */}
-      <div className="relative z-10 flex flex-col items-center py-5">
-        <div className="relative mb-2 flex h-20 w-20 items-center justify-center rounded-full border-2 border-purple-500/50 bg-purple-900/30 text-5xl shadow-lg shadow-purple-900/30">
-          👩‍⚕️
-          {state.hasRelationship && <span className="absolute -top-1 -right-1 text-lg">💕</span>}
+      {/* Character + Stats row */}
+      <div className="relative z-10 flex items-center gap-3 px-4 py-3">
+        <button
+          onClick={onOpenWardrobe}
+          className="group relative shrink-0"
+          title="Открыть гардероб"
+        >
+          <div className="relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-b from-purple-900/40 to-indigo-900/20 px-1 pt-1 pb-0">
+            <CharacterSVG appearance={state.character} size={68} />
+            <div className="absolute inset-0 rounded-2xl bg-purple-500/0 group-hover:bg-purple-500/10 transition-colors" />
+            <div className="absolute bottom-1 right-1 rounded-full bg-black/60 px-1.5 py-0.5 font-mono text-[9px] text-white/80">
+              👗
+            </div>
+          </div>
+        </button>
+
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <p className="font-sans text-sm font-semibold">{state.character.name}</p>
+            {state.hasRelationship && <span className="text-sm">💕</span>}
+            <span className="font-mono text-xs text-white/40">медик, 1 курс</span>
+          </div>
+          <StatBar label="⚡ Энергия" value={state.stats.energy} color="bg-yellow-400" />
+          <StatBar label="😊 Настроение" value={state.stats.mood} color="bg-pink-400" />
+          <StatBar label="📚 Знания" value={state.stats.knowledge} color="bg-blue-400" />
+          <StatBar label="🤝 Соц. рейтинг" value={state.stats.socialRating} color="bg-green-400" />
         </div>
-        <p className="font-sans text-base font-semibold">Аня</p>
-        <p className="font-mono text-xs text-white/50">студентка-медик, 1 курс</p>
       </div>
 
-      {/* Stats */}
-      <div className="relative z-10 mx-4 mb-4 rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
-        <StatBar label="⚡ Энергия" value={state.stats.energy} color="bg-yellow-400" />
-        <StatBar label="😊 Настроение" value={state.stats.mood} color="bg-pink-400" />
-        <StatBar label="📚 Знания" value={state.stats.knowledge} color="bg-blue-400" />
-        <StatBar label="🤝 Социальный рейтинг" value={state.stats.socialRating} color="bg-green-400" />
-      </div>
+      {/* Last notification */}
+      {state.notifications.length > 0 && (
+        <div className="relative z-10 mx-4 mb-2">
+          <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+            <p className="font-mono text-xs text-white/70 line-clamp-2">{state.notifications[state.notifications.length - 1]}</p>
+          </div>
+        </div>
+      )}
 
       {/* Action grid */}
       <div className="relative z-10 grid grid-cols-2 gap-3 px-4 flex-1">
@@ -98,7 +120,7 @@ export function HubScreen({ state, onOpenRoom, onOpenMap, onOpenShop, onOpenPhon
           {
             emoji: '📱',
             title: 'Телефон',
-            desc: `${state.notifications.length > 0 ? state.notifications.length + ' уведомл.' : 'Карта, расписание'}`,
+            desc: 'Карта, расписание, чаты',
             color: 'from-slate-800/60 to-slate-700/20',
             border: 'border-slate-500/30',
             action: onOpenPhone,

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
-import type { GameState, GameStats, RoomItem } from './types'
-import { INITIAL_STATE, SHOP_ITEMS, PICKUP_LOCATIONS, GAME_EVENTS, MAP_LOCATIONS } from './initialState'
+import type { GameState, GameStats, RoomItem, CharacterAppearance, OutfitId } from './types'
+import { INITIAL_STATE, SHOP_ITEMS, GAME_EVENTS, MAP_LOCATIONS } from './initialState'
 import { MenuScreen } from './screens/MenuScreen'
 import { HubScreen } from './screens/HubScreen'
 import { RoomScreen } from './screens/RoomScreen'
@@ -9,14 +9,18 @@ import { ShopScreen } from './screens/ShopScreen'
 import { PhoneScreen } from './screens/PhoneScreen'
 import { EventScreen } from './screens/EventScreen'
 import { ResultScreen } from './screens/ResultScreen'
+import { CustomizeScreen } from './screens/CustomizeScreen'
+import { WardrobeScreen } from './screens/WardrobeScreen'
 
-type AppScreen = 'menu' | 'hub' | 'room' | 'map' | 'shop' | 'phone' | 'event' | 'result'
+type AppScreen = 'menu' | 'hub' | 'room' | 'map' | 'shop' | 'phone' | 'event' | 'result' | 'customize' | 'wardrobe'
 
 export function Game() {
   const [state, setState] = useState<GameState>(INITIAL_STATE)
   const [screen, setScreen] = useState<AppScreen>('menu')
+  const [isFirstTime, setIsFirstTime] = useState(true)
   const [usedEvents, setUsedEvents] = useState<Set<string>>(new Set())
   const [resultData, setResultData] = useState<{ text: string; effects: Partial<GameStats> } | null>(null)
+  const [prevScreen, setPrevScreen] = useState<AppScreen>('hub')
 
   const updateStats = useCallback((effects: Partial<GameStats>) => {
     setState(prev => ({
@@ -32,10 +36,29 @@ export function Game() {
   }, [])
 
   const handleStart = () => {
-    if (state.day === 1 && screen === 'menu') {
-      setState(prev => ({ ...prev, screen: 'hub' }))
+    if (isFirstTime) {
+      setScreen('customize')
+    } else {
+      setScreen('hub')
     }
+  }
+
+  const handleSaveAppearance = (appearance: CharacterAppearance) => {
+    setState(prev => ({ ...prev, character: appearance }))
+    setIsFirstTime(false)
     setScreen('hub')
+  }
+
+  const handleChangeOutfit = (outfit: OutfitId) => {
+    setState(prev => ({
+      ...prev,
+      character: { ...prev.character, currentOutfit: outfit },
+    }))
+  }
+
+  const handleOpenCustomize = () => {
+    setPrevScreen(screen)
+    setScreen('customize')
   }
 
   const handlePlaceItem = (itemId: string, x: number, y: number) => {
@@ -68,48 +91,52 @@ export function Game() {
     if (!shopItem) return
 
     const newItem: RoomItem = { ...shopItem }
-    setState(prev => ({
-      ...prev,
-      orders: [
-        ...prev.orders,
-        {
-          id: `order_${Date.now()}`,
-          item: newItem,
-          status: 'ordered',
-          pickupLocation: pickup,
-        },
-      ],
-      notifications: [
-        ...prev.notifications,
-        `📦 Заказ «${shopItem.name}» оформлен! Будет в ${pickup} через 1 день.`,
-      ],
-    }))
+
+    // Unlock outfit if clothing item ordered
+    const outfitMap: Record<string, OutfitId> = {
+      scrubs: 'scrubs',
+      hoodie: 'cozy',
+      sneakers: 'sporty',
+    }
+
+    setState(prev => {
+      const outfitToUnlock = outfitMap[itemId]
+      const newOutfits = outfitToUnlock && !prev.character.unlockedOutfits.includes(outfitToUnlock)
+        ? [...prev.character.unlockedOutfits, outfitToUnlock]
+        : prev.character.unlockedOutfits
+
+      return {
+        ...prev,
+        orders: [
+          ...prev.orders,
+          { id: `order_${Date.now()}`, item: newItem, status: 'ordered', pickupLocation: pickup },
+        ],
+        character: { ...prev.character, unlockedOutfits: newOutfits as OutfitId[] },
+        notifications: [
+          ...prev.notifications,
+          `📦 Заказ «${shopItem.name}» оформлен! Будет в ${pickup} через 1 день.`,
+        ],
+      }
+    })
   }
 
   const handleGoTo = (locationId: string) => {
     const loc = MAP_LOCATIONS.find(l => l.id === locationId)
     if (!loc) return
 
-    const isPickup = ['ozon', 'post', 'wildberries', 'cdek'].includes(locationId) || locationId === 'ozon'
-
     setState(prev => {
       const newState = { ...prev, currentLocation: loc.name }
-
-      // Unlock adjacent locations
       const newUnlocked = [...prev.unlockedLocations]
       if (!newUnlocked.includes(loc.name)) newUnlocked.push(loc.name)
 
-      // Unlock park/clinic/supermarket after visiting university/cafe
       if (loc.id === 'university' && !newUnlocked.includes('Парк Победы')) newUnlocked.push('Парк Победы')
       if (loc.id === 'cafe' && !newUnlocked.includes('Супермаркет')) newUnlocked.push('Супермаркет')
       if (loc.id === 'university' && !newUnlocked.includes('Библиотека')) newUnlocked.push('Библиотека')
       if (loc.id === 'park' && !newUnlocked.includes('ТЦ «Галерея»')) newUnlocked.push('ТЦ «Галерея»')
       if (loc.id === 'university' && !newUnlocked.includes('Частная клиника')) newUnlocked.push('Частная клиника')
       if (loc.id === 'cafe' && !newUnlocked.includes('Метро')) newUnlocked.push('Метро')
-
       newState.unlockedLocations = newUnlocked
 
-      // Pickup orders at PVZ
       if (locationId === 'ozon') {
         const updatedOrders = prev.orders.map(o =>
           o.status === 'ready' ? { ...o, status: 'picked' as const } : o
@@ -124,7 +151,6 @@ export function Game() {
       return newState
     })
 
-    // Energy cost of travel
     updateStats({ energy: -5 })
     setScreen('hub')
   }
@@ -144,7 +170,6 @@ export function Game() {
     const event = state.currentEvent
     if (event) {
       setUsedEvents(prev => new Set([...prev, event.id]))
-      // Special: relationship event
       if (event.id === 'relationship_start' && effects.mood && effects.mood > 0) {
         setState(prev => ({ ...prev, hasRelationship: true, partnerName: 'Антон' }))
       }
@@ -156,12 +181,10 @@ export function Game() {
 
   const handleNextDay = () => {
     setState(prev => {
-      // Advance orders: ordered → ready
       const updatedOrders = prev.orders.map(o =>
         o.status === 'ordered' ? { ...o, status: 'ready' as const } : o
       )
       const newReady = updatedOrders.filter(o => o.status === 'ready').length - prev.orders.filter(o => o.status === 'ready').length
-
       const newNotifications = newReady > 0
         ? [...prev.notifications.slice(-4), `📦 ${newReady} заказ(а) готов к получению в ПВЗ!`]
         : prev.notifications.slice(-4)
@@ -185,6 +208,27 @@ export function Game() {
     return <MenuScreen onStart={handleStart} state={state} />
   }
 
+  if (screen === 'customize') {
+    return (
+      <CustomizeScreen
+        appearance={state.character}
+        onSave={handleSaveAppearance}
+        isFirstTime={isFirstTime}
+      />
+    )
+  }
+
+  if (screen === 'wardrobe') {
+    return (
+      <WardrobeScreen
+        appearance={state.character}
+        onChangeOutfit={handleChangeOutfit}
+        onCustomize={handleOpenCustomize}
+        onBack={() => setScreen('hub')}
+      />
+    )
+  }
+
   if (screen === 'hub') {
     return (
       <HubScreen
@@ -193,6 +237,7 @@ export function Game() {
         onOpenMap={() => setScreen('map')}
         onOpenShop={() => setScreen('shop')}
         onOpenPhone={() => setScreen('phone')}
+        onOpenWardrobe={() => setScreen('wardrobe')}
         onNextDay={handleNextDay}
         onTriggerEvent={handleTriggerEvent}
       />
@@ -211,23 +256,11 @@ export function Game() {
   }
 
   if (screen === 'map') {
-    return (
-      <MapScreen
-        state={state}
-        onGoTo={handleGoTo}
-        onBack={() => setScreen('hub')}
-      />
-    )
+    return <MapScreen state={state} onGoTo={handleGoTo} onBack={() => setScreen('hub')} />
   }
 
   if (screen === 'shop') {
-    return (
-      <ShopScreen
-        state={state}
-        onOrder={handleOrder}
-        onBack={() => setScreen('hub')}
-      />
-    )
+    return <ShopScreen state={state} onOrder={handleOrder} onBack={() => setScreen('hub')} />
   }
 
   if (screen === 'phone') {
@@ -242,22 +275,11 @@ export function Game() {
   }
 
   if (screen === 'event' && state.currentEvent) {
-    return (
-      <EventScreen
-        event={state.currentEvent}
-        onChoice={handleChoice}
-      />
-    )
+    return <EventScreen event={state.currentEvent} onChoice={handleChoice} />
   }
 
   if (screen === 'result' && resultData) {
-    return (
-      <ResultScreen
-        result={resultData.text}
-        effects={resultData.effects}
-        onContinue={() => setScreen('hub')}
-      />
-    )
+    return <ResultScreen result={resultData.text} effects={resultData.effects} onContinue={() => setScreen('hub')} />
   }
 
   return <MenuScreen onStart={handleStart} state={state} />

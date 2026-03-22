@@ -11,6 +11,17 @@ export const INITIAL_STATE: GameState = {
     money: 500,
     socialRating: 30,
   },
+  character: {
+    name: 'Аня',
+    skinTone: 'light' as const,
+    hairColor: 'brown' as const,
+    hairStyle: 'ponytail' as const,
+    bodyShape: 'average' as const,
+    eyeColor: 'brown' as const,
+    faceShape: 'oval' as const,
+    currentOutfit: 'casual' as const,
+    unlockedOutfits: ['casual', 'scrubs', 'cozy'] as const,
+  },
   roomItems: [
     { id: 'bed', name: 'Кровать', emoji: '🛏️', category: 'furniture', placed: false },
     { id: 'desk', name: 'Письменный стол', emoji: '🪑', category: 'furniture', placed: false },
