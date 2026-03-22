@@ -1,18 +1,20 @@
 import { useState, useCallback } from 'react'
-import type { GameState, GameStats, RoomItem, CharacterAppearance, OutfitId } from './types'
+import type { GameState, GameStats, RoomItem, CharacterAppearance, OutfitId, Friend } from './types'
 import { INITIAL_STATE, SHOP_ITEMS, GAME_EVENTS, MAP_LOCATIONS } from './initialState'
+import { FRIEND_DIALOGS, getNextDialog } from './data/friendDialogs'
 import { MenuScreen } from './screens/MenuScreen'
 import { HubScreen } from './screens/HubScreen'
 import { RoomScreen } from './screens/RoomScreen'
 import { MapScreen } from './screens/MapScreen'
 import { ShopScreen } from './screens/ShopScreen'
 import { PhoneScreen } from './screens/PhoneScreen'
+import { ChatScreen } from './screens/ChatScreen'
 import { EventScreen } from './screens/EventScreen'
 import { ResultScreen } from './screens/ResultScreen'
 import { CustomizeScreen } from './screens/CustomizeScreen'
 import { WardrobeScreen } from './screens/WardrobeScreen'
 
-type AppScreen = 'menu' | 'hub' | 'room' | 'map' | 'shop' | 'phone' | 'event' | 'result' | 'customize' | 'wardrobe'
+type AppScreen = 'menu' | 'hub' | 'room' | 'map' | 'shop' | 'phone' | 'chat' | 'event' | 'result' | 'customize' | 'wardrobe'
 
 export function Game() {
   const [state, setState] = useState<GameState>(INITIAL_STATE)
@@ -21,6 +23,8 @@ export function Game() {
   const [usedEvents, setUsedEvents] = useState<Set<string>>(new Set())
   const [resultData, setResultData] = useState<{ text: string; effects: Partial<GameStats> } | null>(null)
   const [prevScreen, setPrevScreen] = useState<AppScreen>('hub')
+  const [activeChatFriend, setActiveChatFriend] = useState<Friend | null>(null)
+  const [usedDialogs, setUsedDialogs] = useState<Record<string, number[]>>({})
 
   const updateStats = useCallback((effects: Partial<GameStats>) => {
     setState(prev => ({
@@ -263,6 +267,35 @@ export function Game() {
     return <ShopScreen state={state} onOrder={handleOrder} onBack={() => setScreen('hub')} />
   }
 
+  const handleOpenChat = (friend: Friend) => {
+    setActiveChatFriend(friend)
+    setScreen('chat')
+  }
+
+  const handleChatReply = (replyIndex: number, effect: { mood?: number; socialRating?: number }) => {
+    if (!activeChatFriend) return
+    const fid = activeChatFriend.id
+    const used = usedDialogs[fid] ?? []
+    const next = getNextDialog(fid, used)
+    if (next) {
+      setUsedDialogs(prev => ({ ...prev, [fid]: [...used, next.index] }))
+    }
+    // Update friend relationship & stats
+    setState(prev => ({
+      ...prev,
+      stats: {
+        ...prev.stats,
+        mood: Math.max(0, Math.min(100, prev.stats.mood + (effect.mood ?? 0))),
+        socialRating: Math.max(0, Math.min(100, prev.stats.socialRating + (effect.socialRating ?? 0))),
+      },
+      friends: prev.friends.map(f =>
+        f.id === fid
+          ? { ...f, relationship: Math.min(100, f.relationship + Math.abs(effect.socialRating ?? 0) / 2) }
+          : f
+      ),
+    }))
+  }
+
   if (screen === 'phone') {
     return (
       <PhoneScreen
@@ -270,6 +303,24 @@ export function Game() {
         onBack={() => setScreen('hub')}
         onOpenMap={() => setScreen('map')}
         onOpenShop={() => setScreen('shop')}
+        onOpenChat={handleOpenChat}
+      />
+    )
+  }
+
+  if (screen === 'chat' && activeChatFriend) {
+    const fid = activeChatFriend.id
+    const used = usedDialogs[fid] ?? []
+    const next = getNextDialog(fid, used)
+    const dialogs = FRIEND_DIALOGS[fid]
+    const dialog = next?.dialog ?? dialogs?.[0]
+    if (!dialog) return <PhoneScreen state={state} onBack={() => setScreen('phone')} onOpenMap={() => setScreen('map')} onOpenShop={() => setScreen('shop')} onOpenChat={handleOpenChat} />
+    return (
+      <ChatScreen
+        friend={activeChatFriend}
+        chat={dialog}
+        onReply={handleChatReply}
+        onBack={() => setScreen('phone')}
       />
     )
   }
